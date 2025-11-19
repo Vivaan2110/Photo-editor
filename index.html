@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Photo Editor — Manual Crop</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body{background:#f6f8fb;font-family:system-ui,Segoe UI,Roboto,Arial;padding:18px}
+    .card{border-radius:10px;box-shadow:0 6px 18px rgba(40,40,60,0.06)}
+    .dropzone{border:2px dashed #dfeefe;border-radius:8px;padding:18px;text-align:center;background:#fbfeff;cursor:pointer}
+    .preview-img{max-width:100%;height:auto;border-radius:6px;border:1px solid #eef3fb}
+    label.small{font-size:.85rem}
+    .muted{color:#666;font-size:.9rem}
+    .compact { gap: .5rem; display:flex; flex-wrap:wrap; align-items:center; }
+    input[type=number] { max-width:130px; }
+    pre.resp { background:#fff;padding:8px;border-radius:6px;border:1px solid #eee; max-height:160px; overflow:auto }
+    .form-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="row g-3">
+    <div class="col-12">
+      <h4>Photo Editor</h4>
+      <p class="muted">Upload → manual coordinate crop → other ops → download</p>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3">
+        <h6>Upload</h6>
+        <div id="drop" class="dropzone mb-2">Click to choose or drag & drop image<input id="fileInput" type="file" accept="image/*" style="display:none"></div>
+
+        <div class="mb-2 compact">
+          <button id="uploadBtn" class="btn btn-primary btn-sm">Upload</button>
+          <button id="clearBtn" class="btn btn-outline-secondary btn-sm">Clear</button>
+          <div id="uploadInfo" class="muted"></div>
+        </div>
+
+        <h6 class="mt-2">Preview</h6>
+        <div class="text-center mb-2">
+          <img id="uploadedPreview" class="preview-img" src="" style="display:none">
+        </div>
+        <div class="small">Filename: <span id="filenameText">—</span></div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="card p-3">
+        <h6>Manual Crop (enter coords)</h6>
+
+        <div class="row g-2">
+          <div class="col-sm-3">
+            <label class="small">Left</label>
+            <input id="left" type="number" step="any" class="form-control form-control-sm" placeholder="px or 0..1">
+          </div>
+          <div class="col-sm-3">
+            <label class="small">Upper</label>
+            <input id="upper" type="number" step="any" class="form-control form-control-sm" placeholder="px or 0..1">
+          </div>
+          <div class="col-sm-3">
+            <label class="small">Right</label>
+            <input id="right" type="number" step="any" class="form-control form-control-sm" placeholder="px or 0..1">
+          </div>
+          <div class="col-sm-3">
+            <label class="small">Lower</label>
+            <input id="lower" type="number" step="any" class="form-control form-control-sm" placeholder="px or 0..1">
+          </div>
+        </div>
+
+        <div class="form-row mt-2">
+          <div class="form-check">
+            <input id="usePercent" class="form-check-input" type="checkbox">
+            <label class="form-check-label small">Inputs are percentages (0..1)</label>
+          </div>
+          <button id="autoPercent" class="btn btn-outline-secondary btn-sm">10%-90%</button>
+          <button id="cropBtn" class="btn btn-primary btn-sm">Crop</button>
+          <div id="cropMsg" class="muted" style="margin-left:.5rem"></div>
+        </div>
+
+        <hr>
+
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small">Resize</label>
+            <div class="input-group mb-1">
+              <input id="r_width" class="form-control form-control-sm" placeholder="width">
+              <input id="r_height" class="form-control form-control-sm" placeholder="height">
+              <button id="resizeBtn" class="btn btn-outline-primary btn-sm">Apply</button>
+            </div>
+            <div><input id="r_keep" type="checkbox" checked /> <span class="small">Keep aspect</span></div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label small">Rotate</label>
+            <div class="input-group mb-1">
+              <input id="rot_angle" class="form-control form-control-sm" value="90">
+              <button id="rotateBtn" class="btn btn-outline-primary btn-sm">Rotate</button>
+              <div class="form-check ms-2">
+                <input id="rot_expand" class="form-check-input" type="checkbox" checked/>
+                <label class="form-check-label small">Expand</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr/>
+
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small">Aspect (server)</label>
+            <div class="input-group mb-1">
+              <input id="asp_w" class="form-control form-control-sm" placeholder="target width">
+              <input id="asp_h" class="form-control form-control-sm" placeholder="target height">
+              <select id="asp_mode" class="form-select form-select-sm" style="max-width:120px">
+                <option value="fit">fit</option><option value="fill">fill</option><option value="pad">pad</option>
+              </select>
+              <button id="aspectBtn" class="btn btn-outline-primary btn-sm">Apply</button>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label small">Convert</label>
+            <div class="input-group mb-1">
+              <select id="conv_fmt" class="form-select form-select-sm" style="max-width:120px">
+                <option>JPEG</option><option>PNG</option><option>WEBP</option>
+              </select>
+              <input id="conv_quality" type="number" class="form-control form-control-sm" value="85" style="max-width:90px">
+              <button id="convertBtn" class="btn btn-outline-primary btn-sm">Convert</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2">
+          <div class="col-md-6">
+            <label class="form-label small">Thumbnail</label>
+            <div class="input-group">
+              <input id="t_w" class="form-control form-control-sm" value="200" style="max-width:110px">
+              <input id="t_h" class="form-control form-control-sm" value="200" style="max-width:110px">
+              <button id="thumbBtn" class="btn btn-outline-primary btn-sm">Make Thumb</button>
+            </div>
+          </div>
+
+          <div class="col-md-6 text-center">
+            <div id="resultMsg" class="small text-muted mb-1"></div>
+            <div id="resultPreview"></div>
+            <div id="downloadBox" class="mt-2"></div>
+            <pre id="rawResp" class="resp" style="display:none"></pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const apiBase = ''; // same origin
+let currentFilename = '';
+let uploadedBlobURL = null;
+
+function el(id){ return document.getElementById(id); }
+
+async function postForm(path, form, onProgress){
+  // simple fetch wrapper, progress unsupported for fetch; using XHR earlier but fetch is fine for posts w/o progress
+  const resp = await fetch(apiBase + path, { method: 'POST', body: form });
+  const text = await resp.text();
+  let json;
+  try { json = JSON.parse(text); } catch(e) { throw { status: resp.status, text }; }
+  if(!resp.ok) throw json;
+  return json;
+}
+
+function showResult(resp){
+  el('resultMsg').textContent = '';
+  el('resultPreview').innerHTML = '';
+  el('downloadBox').innerHTML = '';
+  el('rawResp').style.display = 'none';
+  if(!resp) return;
+  el('rawResp').style.display = 'block';
+  el('rawResp').textContent = JSON.stringify(resp, null, 2);
+  const url = resp.download_url || (resp.path ? (resp.path.startsWith('/') ? resp.path : ('/download/' + resp.path)) : null);
+  if(url){
+    const full = url.startsWith('http') ? url : window.location.origin + url;
+    el('resultPreview').innerHTML = `<img class="preview-img" src="${full}">`;
+    el('downloadBox').innerHTML = `<a class="btn btn-success btn-sm" href="${full}" download>Download</a>`;
+  }
+}
+
+/* Upload area */
+const drop = el('drop');
+drop.addEventListener('click', ()=> el('fileInput').click());
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('border-primary'); });
+drop.addEventListener('dragleave', ()=> drop.classList.remove('border-primary'));
+drop.addEventListener('drop', e=>{ e.preventDefault(); drop.classList.remove('border-primary'); const f = e.dataTransfer.files[0]; if(f) handleFileSelect(f); });
+
+el('fileInput').addEventListener('change', e=> { const f = e.target.files[0]; if(f) handleFileSelect(f); });
+
+function handleFileSelect(file){
+  el('uploadInfo').textContent = `${file.name} — ${Math.round(file.size/1024)}KB`;
+  if(uploadedBlobURL) URL.revokeObjectURL(uploadedBlobURL);
+  uploadedBlobURL = URL.createObjectURL(file);
+  el('uploadedPreview').src = uploadedBlobURL;
+  el('uploadedPreview').style.display = 'block';
+  el('filenameText').textContent = 'not uploaded';
+  currentFilename = '';
+  showResult(null);
+}
+
+el('uploadBtn').addEventListener('click', async ()=>{
+  const f = el('fileInput').files[0];
+  if(!f){ alert('choose a file'); return; }
+  const fd = new FormData(); fd.append('file', f);
+  try{
+    el('cropMsg').textContent = 'uploading...';
+    const data = await postForm('/upload', fd);
+    currentFilename = data.filename;
+    el('filenameText').textContent = currentFilename;
+    const serverURL = data.download_url ? data.download_url : ('/download/uploads/' + data.filename);
+    el('uploadedPreview').src = serverURL;
+    el('uploadedPreview').style.display = 'block';
+    el('cropMsg').textContent = 'uploaded';
+    showResult(data);
+  }catch(e){
+    el('cropMsg').textContent = 'upload failed';
+    console.error(e);
+    alert('upload failed — check console');
+  }
+});
+
+el('clearBtn').addEventListener('click', ()=>{
+  el('fileInput').value=''; el('uploadedPreview').src=''; el('uploadedPreview').style.display='none';
+  el('uploadInfo').textContent=''; el('filenameText').textContent='—'; currentFilename=''; showResult(null);
+});
+
+/* Manual crop: convert percents -> pixels using natural size of preview, then post */
+el('autoPercent').addEventListener('click', ()=> {
+  el('left').value = 0.1; el('upper').value = 0.1; el('right').value = 0.9; el('lower').value = 0.9;
+});
+
+el('cropBtn').addEventListener('click', async ()=>{
+  if(!currentFilename){ alert('upload first'); return; }
+  const toNum = v => { const n = Number(v); return Number.isFinite(n) ? n : NaN; };
+  let l = toNum(el('left').value), u = toNum(el('upper').value), r = toNum(el('right').value), ll = toNum(el('lower').value);
+  if([l,u,r,ll].some(x=>isNaN(x))){ alert('enter all four numbers'); return; }
+
+  const usePercent = el('usePercent').checked;
+  let sendL=l, sendU=u, sendR=r, sendLL=ll;
+  if(usePercent){
+    const img = el('uploadedPreview');
+    const naturalW = img.naturalWidth || img.width;
+    const naturalH = img.naturalHeight || img.height;
+    if(!naturalW || !naturalH){ alert('image not loaded fully for percent conversion'); return; }
+    if(l<0 || l>1 || u<0 || u>1 || r<0 || r>1 || ll<0 || ll>1){ alert('percent values must be between 0 and 1'); return; }
+    sendL = Math.round(l * naturalW);
+    sendU = Math.round(u * naturalH);
+    sendR = Math.round(r * naturalW);
+    sendLL = Math.round(ll * naturalH);
+  }
+
+  if(sendR <= sendL || sendLL <= sendU){ alert('invalid box: right must be > left and lower > upper'); return; }
+
+  const fd = new FormData();
+  fd.append('filename', currentFilename);
+  fd.append('left', sendL);
+  fd.append('upper', sendU);
+  fd.append('right', sendR);
+  fd.append('lower', sendLL);
+
+  try{
+    el('cropMsg').textContent = 'cropping...';
+    const data = await postForm('/crop', fd);
+    el('cropMsg').textContent = 'done';
+    showResult(data);
+  }catch(e){
+    el('cropMsg').textContent = 'crop failed';
+    console.error(e);
+    alert('crop failed — check console');
+  }
+});
+
+/* Resize */
+el('resizeBtn').addEventListener('click', async ()=>{
+  if(!currentFilename){ alert('upload first'); return; }
+  const fd = new FormData(); fd.append('filename', currentFilename);
+  const w = el('r_width').value; if(w) fd.append('width', w);
+  const h = el('r_height').value; if(h) fd.append('height', h);
+  fd.append('keep_aspect', el('r_keep').checked);
+  try{ const data = await postForm('/resize', fd); showResult(data); }catch(e){ showResult(e); }
+});
+
+/* Rotate */
+el('rotateBtn').addEventListener('click', async ()=>{
+  if(!currentFilename){ alert('upload first'); return; }
+  const fd = new FormData(); fd.append('filename', currentFilename);
+  fd.append('angle', el('rot_angle').value);
+  fd.append('expand', el('rot_expand').checked);
+  try{ const data = await postForm('/rotate', fd); showResult(data); }catch(e){ showResult(e); }
+});
+
+/* Convert */
+el('convertBtn').addEventListener('click', async ()=>{
+  if(!currentFilename){ alert('upload first'); return; }
+  const fd = new FormData(); fd.append('filename', currentFilename);
+  fd.append('fmt', el('conv_fmt').value); fd.append('quality', el('conv_quality').value);
+  try{ const data = await postForm('/convert', fd); showResult(data); }catch(e){ showResult(e); }
+});
+
+/* Thumbnail */
+el('thumbBtn').addEventListener('click', async ()=>{
+  if(!currentFilename){ alert('upload first'); return; }
+  const fd = new FormData(); fd.append('filename', currentFilename);
+  fd.append('w', el('t_w').value); fd.append('h', el('t_h').value);
+  try{ const data = await postForm('/thumbnail', fd); showResult(data); }catch(e){ showResult(e); }
+});
+
+/* Aspect */
+el('aspectBtn').addEventListener('click', async ()=>{
+  if(!currentFilename){ alert('upload first'); return; }
+  const w = el('asp_w').value, h = el('asp_h').value;
+  if(!w || !h){ alert('enter target width & height'); return; }
+  const fd = new FormData(); fd.append('filename', currentFilename);
+  fd.append('target_w', w); fd.append('target_h', h); fd.append('mode', el('asp_mode').value);
+  try{ const data = await postForm('/aspect', fd); showResult(data); }catch(e){ showResult(e); }
+});
+</script>
+</body>
+</html>
